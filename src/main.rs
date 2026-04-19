@@ -2,7 +2,10 @@ use crate::{
     app::{core::Core, runtime::Runtime},
     infrastructure::{memory::Memory, modules::Modules, openai::OpenAi},
 };
-use openai_api_rust::{Auth, OpenAI};
+use genai::{
+    Client, ModelIden,
+    resolver::{AuthData, AuthResolver},
+};
 
 mod app;
 mod domain;
@@ -13,11 +16,22 @@ mod services;
 async fn main() {
     dotenvy::dotenv().ok();
 
-    let auth = Auth::new(dotenvy::var("OPENAI_API_KEY").unwrap().as_str());
-    let openai = OpenAI::new(auth, "https://api.openai.com/v1/");
+    let auth_resolver = AuthResolver::from_resolver_fn(
+        |model_iden: ModelIden| -> Result<Option<AuthData>, genai::resolver::Error> {
+            let key = dotenvy::var("OPENAI_API_KEY").map_err(|_| {
+                genai::resolver::Error::ApiKeyEnvNotFound {
+                    env_name: "OPENAI_API_KEY".to_string(),
+                }
+            })?;
+            Ok(Some(AuthData::from_single(key)))
+        },
+    );
+
+    let client = Client::builder().with_auth_resolver(auth_resolver).build();
+
     let mut core = Core::new(
-        OpenAi::new(openai.clone()),
-        Memory::new(openai),
+        OpenAi::new(client.clone()),
+        Memory::new(client),
         Runtime::new(Modules::new()),
     );
 

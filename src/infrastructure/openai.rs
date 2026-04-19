@@ -1,47 +1,57 @@
-use openai_api_rust::{
-    Message, OpenAI, Role,
-    chat::{ChatApi, ChatBody},
+use genai::{
+    Client,
+    chat::{ChatMessage, ChatOptions, ChatRequest, JsonSpec},
 };
-use serde_json::from_str;
+use serde_json::{from_str, json};
 
 use crate::{app::dto::LLMResponse, domain::error::AppError, services::llm::LLMService};
 
 pub struct OpenAi {
-    openai: OpenAI,
-    messages: Vec<Message>,
+    client: Client,
+    messages: ChatRequest,
+    chat_options: ChatOptions,
 }
 
 impl OpenAi {
-    pub fn new(openai: OpenAI) -> Self {
+    pub fn new(client: Client) -> Self {
+        let json_schema = json!({
+          "type": "object",
+          "properties": {
+            "response": {
+              "type": "string",
+              "description": "Основной текст ответа пользователю"
+            },
+            "memory_candidates": {
+              "type": "array",
+              "description": "Кандидаты для сохранения в память",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "description": "Краткое описание факта"
+                  },
+                  "importance": {
+                    "type": "number",
+                    "description": "Важность (0.0 - 1.0)"
+                  }
+                },
+                "required": ["summary", "importance"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["response", "memory_candidates"],
+          "additionalProperties": false
+        });
+
         Self {
-            openai,
-            messages: vec![Message {
-                role: Role::System,
-                content: r#"e.to_string()
-                    Отвечай строго в формате Json:
-
-                    {
-                        "response": string,
-                        "actions": [actions],
-                        "memory_candidates": [memory_candidates]
-                    }
-
-                    //actions:
-                    {
-                        "type": string,
-                        "args": [string]
-                    }
-
-                    //memory_candidates:
-                    {
-                        "summary": string,
-                        "importance": float
-                    }
-
-                    НИКОГДА НЕ ОТВЕЧАЙ ПОЛЬЗОВАТЕЛЮ ПРОСТЫМ ТЕКСТОМ. НЕ ЗАПИСЫВАЙ В ПАМЯТЬ ТО, ЧТО УЖЕ ЗАПИСАНО.
-                    "#
-                .to_string(),
-            }],
+            client,
+            messages: ChatRequest::new(vec![ChatMessage::system(
+                "НИКОГДА НЕ ОТВЕЧАЙ ПОЛЬЗОВАТЕЛЮ ПРОСТЫМ ТЕКСТОМ. НЕ ЗАПИСЫВАЙ В ПАМЯТЬ ТО, ЧТО УЖЕ ЗАПИСАНО.",
+            )]),
+            chat_options: ChatOptions::default()
+                .with_response_format(JsonSpec::new("main-schema", json_schema)),
         }
     }
 }
@@ -52,50 +62,27 @@ impl LLMService for OpenAi {
         input: &str,
         context: Vec<String>,
     ) -> Result<LLMResponse, AppError> {
-        let mut messages = self.messages.clone();
-
-        messages.push(Message {
-            role: Role::System,
-            content: format!("Из памяти:\n{}", context.join("\n")),
-        });
-
-        messages.push(Message {
-            role: Role::User,
-            content: input.to_string(),
-        });
-
-        let body = ChatBody {
-            model: "gpt-4.1".to_string(),
-            max_tokens: Some(200),
-            temperature: Some(0.7),
-            top_p: None,
-            n: None,
-            stream: Some(false),
-            stop: None,
-            presence_penalty: None,
-            frequency_penalty: None,
-            logit_bias: None,
-            user: None,
-            messages,
-        };
+        let messages = self.messages.clone().append_messages(vec![
+            ChatMessage::user(format!("Из памяти:\n{}", context.join("\n"))),
+            ChatMessage::user(input.to_string()),
+        ]);
 
         let rs = self
-            .openai
-            .chat_completion_create(&body)
+            .client
+            .exec_chat("gpt-5.4", messages, Some(&self.chat_options))
+            .await
             .map_err(|e| AppError::LLMError(e.to_string()))?;
 
-        let message = rs.choices[0]
-            .message
+        let message = rs.first_text();
+        let message = message
             .as_ref()
             .ok_or_else(|| AppError::LLMError("No message in response".to_string()))?;
-
-        let content = message.content.clone();
 
         /*self.messages.push(Message {
             role: Role::Assistant,
             content: content.clone(),
         });*/
 
-        Ok(from_str::<LLMResponse>(&content).map_err(|e| AppError::LLMError(e.to_string()))?)
+        Ok(from_str::<LLMResponse>(message).map_err(|e| AppError::LLMError(e.to_string()))?)
     }
 }

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize, Clone)]
 pub struct LLMResponse {
     pub response: String,
-    pub actions: Vec<Action>,
+    pub actions: Option<Vec<Action>>,
     pub memory_candidates: Vec<MemoryCandidate>,
 }
 

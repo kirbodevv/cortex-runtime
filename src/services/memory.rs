@@ -8,7 +8,7 @@ pub struct MemoryItem {
     pub created_at: DateTime<Utc>,
 }
 
-pub trait MemoryService {
-    fn search(&self, query: &str) -> Result<Vec<MemoryItem>, AppError>;
-    fn save(&mut self, item: MemoryCandidate) -> Result<(), AppError>;
+pub trait MemoryService: Send + Sync {
+    async fn search(&self, query: &str) -> Result<Vec<MemoryItem>, AppError>;
+    async fn save(&mut self, item: MemoryCandidate) -> Result<(), AppError>;
 }

@@ -32,7 +32,8 @@ where
     pub async fn process(&mut self, input: &str) -> Result<String, AppError> {
         let memory_ctx = self
             .memory
-            .search(input)?
+            .search(input)
+            .await?
             .into_iter()
             .map(|m| m.content)
             .collect();
@@ -42,7 +43,7 @@ where
         let _ = self.runtime.execute(llm_response.clone()).await;
 
         for mem in llm_response.memory_candidates {
-            self.memory.save(mem)?;
+            self.memory.save(mem).await?;
         }
 
         Ok(llm_response.response)

@@ -1,8 +1,5 @@
 use chrono::Utc;
-use openai_api_rust::{
-    OpenAI,
-    embeddings::{EmbeddingsApi, EmbeddingsBody},
-};
+use genai::Client;
 use similarity::{Similarity, similarity_traits::CosineSimilarity};
 
 use crate::{
@@ -12,42 +9,31 @@ use crate::{
 };
 
 pub struct Memory {
-    openai: OpenAI,
-    memories: Vec<(MemoryItem, Vec<f64>)>,
+    client: Client,
+    memories: Vec<(MemoryItem, Vec<f32>)>,
 }
 
 impl Memory {
-    pub fn new(openai: OpenAI) -> Self {
+    pub fn new(client: Client) -> Self {
         Self {
-            openai,
+            client,
             memories: Vec::new(),
         }
     }
 
-    fn embed(&self, input: &str) -> Result<Vec<f64>, AppError> {
-        let body = EmbeddingsBody {
-            model: "text-embedding-3-large".to_string(),
-            input: vec![input.to_string()],
-            user: None,
-        };
-
-        let embeddings = self
-            .openai
-            .embeddings_create(&body)
-            .map_err(|_| AppError::MemoryError)?
-            .data
-            .as_deref()
-            .ok_or(AppError::MemoryError)?[0]
-            .embedding
-            .clone()
-            .ok_or(AppError::MemoryError)?;
-        Ok(embeddings)
+    async fn embed(&self, input: &str) -> Result<Vec<f32>, AppError> {
+        let embedding = self
+            .client
+            .embed("text-embedding-3-large", input, None)
+            .await
+            .map_err(|e| AppError::LLMError(e.to_string()))?;
+        Ok(embedding.embeddings[0].clone().vector)
     }
 }
 
 impl MemoryService for Memory {
-    fn search(&self, query: &str) -> Result<Vec<MemoryItem>, AppError> {
-        let query_vec = self.embed(query)?;
+    async fn search(&self, query: &str) -> Result<Vec<MemoryItem>, AppError> {
+        let query_vec = self.embed(query).await?;
 
         let mut items = self
             .memories
@@ -79,14 +65,14 @@ impl MemoryService for Memory {
         Ok(top5)
     }
 
-    fn save(&mut self, item: MemoryCandidate) -> Result<(), AppError> {
+    async fn save(&mut self, item: MemoryCandidate) -> Result<(), AppError> {
         if item.importance > 0.6 {
             self.memories.push((
                 MemoryItem {
                     content: item.summary.clone(),
                     created_at: Utc::now(),
                 },
-                self.embed(item.summary.as_str())?,
+                self.embed(&item.summary).await?,
             ));
             println!("[INFO] ЗАПИСАНО В ПАМЯТЬ: {}", item.summary)
         }

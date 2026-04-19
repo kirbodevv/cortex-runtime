@@ -31,9 +31,11 @@ where
     pub async fn execute(&mut self, llm: LLMResponse) -> RuntimeResult<RuntimeResponse> {
         let mut action_results = vec![];
 
-        for action in llm.actions {
-            let res = self.modules.execute(action);
-            action_results.push(res);
+        if let Some(actions) = llm.actions {
+            for action in actions {
+                let res = self.modules.execute(action);
+                action_results.push(res);
+            }
         }
 
         Ok(RuntimeResponse {
