@@ -4,8 +4,8 @@ use similarity::{Similarity, similarity_traits::CosineSimilarity};
 
 use crate::{
     app::dto::MemoryCandidate,
-    domain::error::AppError,
-    services::memory::{MemoryItem, MemoryService},
+    domain::{AppError, MemoryItem},
+    services::memory::MemoryService,
 };
 
 pub struct Memory {

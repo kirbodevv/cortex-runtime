@@ -1,3 +1,3 @@
 pub mod memory;
-pub mod modules;
+pub mod module;
 pub mod openai;

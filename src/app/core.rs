@@ -1,7 +1,7 @@
 use crate::{
     app::runtime::Runtime,
     domain::error::AppError,
-    services::{llm::LLMService, memory::MemoryService, module_registry::ModuleService},
+    services::{llm::LLMService, memory::MemoryService, module::ModuleService},
 };
 
 pub struct Core<L, ME, MO>

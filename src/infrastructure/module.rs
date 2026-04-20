@@ -1,6 +1,6 @@
 use crate::{
     app::dto::Action,
-    services::module_registry::{ModuleResponse, ModuleResult, ModuleService},
+    services::module::{ModuleResponse, ModuleResult, ModuleService},
 };
 
 pub struct Modules {}

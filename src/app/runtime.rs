@@ -1,17 +1,12 @@
 use crate::{
-    app::dto::LLMResponse,
-    services::module_registry::{ModuleResult, ModuleService},
+    app::dto::{LLMResponse, RuntimeResponse},
+    services::module::ModuleService,
 };
 
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
 #[derive(thiserror::Error, Debug)]
 pub enum RuntimeError {}
-
-pub struct RuntimeResponse {
-    pub response: String,
-    pub action_results: Vec<ModuleResult>,
-}
 
 pub struct Runtime<M>
 where
@@ -40,7 +35,7 @@ where
 
         Ok(RuntimeResponse {
             response: llm.response,
-            action_results,
+            action_results: action_results,
         })
     }
 }
