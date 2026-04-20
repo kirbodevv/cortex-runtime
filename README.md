@@ -22,7 +22,7 @@ It combines:
 
 ## Architecture
 
-![model](images/cortex-runtime model.png)
+![preview](images/cortex-runtime-model.png)
 
 ---
 
