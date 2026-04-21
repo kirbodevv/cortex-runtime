@@ -1,57 +1,31 @@
+use std::sync::Arc;
+
 use genai::{
     Client,
     chat::{ChatMessage, ChatOptions, ChatRequest, JsonSpec},
 };
 use serde_json::{from_str, json};
 
-use crate::{app::dto::LLMResponse, domain::error::AppError, services::llm::LLMService};
+use crate::{
+    app::dto::LLMResponse,
+    domain::error::AppError,
+    services::{llm::LLMService, module::ModuleService},
+};
 
 pub struct OpenAi {
     client: Client,
     messages: ChatRequest,
-    chat_options: ChatOptions,
+    module: Arc<dyn ModuleService>,
 }
 
 impl OpenAi {
-    pub fn new(client: Client) -> Self {
-        let json_schema = json!({
-          "type": "object",
-          "properties": {
-            "response": {
-              "type": "string",
-              "description": "Основной текст ответа пользователю"
-            },
-            "memory_candidates": {
-              "type": "array",
-              "description": "Кандидаты для сохранения в память",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "summary": {
-                    "type": "string",
-                    "description": "Краткое описание факта"
-                  },
-                  "importance": {
-                    "type": "number",
-                    "description": "Важность (0.0 - 1.0)"
-                  }
-                },
-                "required": ["summary", "importance"],
-                "additionalProperties": false
-              }
-            }
-          },
-          "required": ["response", "memory_candidates"],
-          "additionalProperties": false
-        });
-
+    pub fn new(client: Client, module: Arc<dyn ModuleService>) -> Self {
         Self {
             client,
             messages: ChatRequest::new(vec![ChatMessage::system(
                 "НИКОГДА НЕ ОТВЕЧАЙ ПОЛЬЗОВАТЕЛЮ ПРОСТЫМ ТЕКСТОМ. НЕ ЗАПИСЫВАЙ В ПАМЯТЬ ТО, ЧТО УЖЕ ЗАПИСАНО.",
             )]),
-            chat_options: ChatOptions::default()
-                .with_response_format(JsonSpec::new("main-schema", json_schema)),
+            module,
         }
     }
 }
@@ -67,9 +41,56 @@ impl LLMService for OpenAi {
             ChatMessage::user(input.to_string()),
         ]);
 
+        let any_of = self.module.get_modules_schema(input);
+        let should_use_modules = !any_of.is_empty();
+
+        let items = if should_use_modules {
+            json!({ "anyOf": any_of })
+        } else {
+            json!({
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            })
+        };
+
+        let json_schema = json!({
+          "type": "object",
+          "properties": {
+            "response": {
+              "type": "string",
+            },
+            "mem": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                  },
+                  "importance": {
+                    "type": "number",
+                  }
+                },
+                "required": ["summary", "importance"],
+                "additionalProperties": false
+              }
+            },
+            "actions": {
+                "type": "array",
+                "items": items
+            }
+          },
+          "required": ["response", "mem", "actions"],
+          "additionalProperties": false
+        });
+
+        let chat_options =
+            ChatOptions::default().with_response_format(JsonSpec::new("main-schema", json_schema));
+
         let rs = self
             .client
-            .exec_chat("gpt-5.4", messages, Some(&self.chat_options))
+            .exec_chat("gpt-4o-mini", messages, Some(&chat_options))
             .await
             .map_err(|e| AppError::LLMError(e.to_string()))?;
 

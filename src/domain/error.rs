@@ -5,6 +5,6 @@ pub enum AppError {
     #[error("LLM error")]
     LLMError(String),
 
-    #[error("Memory error")]
-    MemoryError,
+    #[error("Runtime error")]
+    RuntimeError(String),
 }

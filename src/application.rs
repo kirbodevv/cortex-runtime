@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use genai::{
     Client,
     resolver::{AuthData, AuthResolver},
@@ -6,9 +8,10 @@ use genai::{
 use crate::{
     app::{core::Core, runtime::Runtime},
     infrastructure::{memory::Memory, module::Modules, openai::OpenAi},
+    modules::echo::EchoModule,
 };
 
-pub fn build() -> Core<OpenAi, Memory, Modules> {
+pub fn build() -> Core<OpenAi, Memory> {
     dotenvy::dotenv().ok();
 
     let auth_resolver =
@@ -23,9 +26,13 @@ pub fn build() -> Core<OpenAi, Memory, Modules> {
 
     let client = Client::builder().with_auth_resolver(auth_resolver).build();
 
+    let mut modules = Modules::new();
+    modules.register(Box::new(EchoModule));
+    let modules = Arc::new(modules);
+
     Core::new(
-        OpenAi::new(client.clone()),
+        OpenAi::new(client.clone(), modules.clone()),
         Memory::new(client),
-        Runtime::new(Modules::new()),
+        Runtime::new(modules),
     )
 }

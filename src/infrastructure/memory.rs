@@ -1,4 +1,3 @@
-use chrono::Utc;
 use genai::Client;
 use similarity::{Similarity, similarity_traits::CosineSimilarity};
 
@@ -70,7 +69,6 @@ impl MemoryService for Memory {
             self.memories.push((
                 MemoryItem {
                     content: item.summary.clone(),
-                    created_at: Utc::now(),
                 },
                 self.embed(&item.summary).await?,
             ));

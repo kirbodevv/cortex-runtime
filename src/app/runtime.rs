@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     app::dto::{LLMResponse, RuntimeResponse},
     services::module::ModuleService,
@@ -8,18 +10,12 @@ pub type RuntimeResult<T> = Result<T, RuntimeError>;
 #[derive(thiserror::Error, Debug)]
 pub enum RuntimeError {}
 
-pub struct Runtime<M>
-where
-    M: ModuleService,
-{
-    pub modules: M,
+pub struct Runtime {
+    modules: Arc<dyn ModuleService + Send + Sync>,
 }
 
-impl<M> Runtime<M>
-where
-    M: ModuleService,
-{
-    pub fn new(modules: M) -> Self {
+impl Runtime {
+    pub fn new(modules: Arc<dyn ModuleService + Send + Sync>) -> Self {
         Self { modules }
     }
 
@@ -33,9 +29,6 @@ where
             }
         }
 
-        Ok(RuntimeResponse {
-            response: llm.response,
-            action_results: action_results,
-        })
+        Ok(RuntimeResponse::new(llm.response, action_results))
     }
 }
