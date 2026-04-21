@@ -1,13 +1,13 @@
 use serde_json::{Value, json};
 
-use crate::{
-    app::dto::Action,
-    services::module::{Module, ModuleError, ModuleResponse, ModuleResult},
+use crate::app::{
+    dto::Action,
+    tools::{Tool, ToolError, ToolResponse, ToolResult},
 };
 
 pub struct EchoModule;
 
-impl Module for EchoModule {
+impl Tool for EchoModule {
     fn name(&self) -> &str {
         "echo"
     }
@@ -36,15 +36,15 @@ impl Module for EchoModule {
         &["echo", "эхо", "консоль", "вывести", "текст"]
     }
 
-    fn execute(&self, action: Action) -> ModuleResult {
+    fn execute(&self, action: Action) -> ToolResult {
         let message = action
             .args
             .get("message")
-            .ok_or(ModuleError::JSON("NOT LLM, BUT OK".to_string()))?
+            .ok_or(ToolError::JSON("Bad json".to_string()))?
             .as_str()
             .unwrap_or("");
         println!("[ECHO]: {}", message);
-        Ok(ModuleResponse {
+        Ok(ToolResponse {
             message: message.to_string(),
         })
     }

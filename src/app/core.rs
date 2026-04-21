@@ -1,44 +1,69 @@
+use std::sync::Arc;
+
 use crate::{
-    app::{dto::RuntimeResponse, runtime::Runtime},
-    domain::error::AppError,
-    services::{llm::LLMService, memory::MemoryService},
+    app::{
+        dto::{CoreResponse, ExecutorResponse, LLMResponse},
+        executor::Executor,
+        memory::memory::MemoryService,
+        ports::{Embedder, LLMClient, MemoryStore},
+        tools::ToolRegistry,
+    },
+    domain::{Context, LLMRequest, Message, error::AppError},
 };
 
-pub struct Core<L, ME>
+pub struct Core<L, E, S>
 where
-    L: LLMService,
-    ME: MemoryService,
+    L: LLMClient,
+    E: Embedder,
+    S: MemoryStore,
 {
     llm: L,
-    memory: ME,
-    runtime: Runtime,
+    memory: MemoryService<E, S>,
+    executor: Executor,
 }
 
-impl<L, ME> Core<L, ME>
+impl<L, E, S> Core<L, E, S>
 where
-    L: LLMService,
-    ME: MemoryService,
+    L: LLMClient,
+    E: Embedder,
+    S: MemoryStore,
 {
-    pub fn new(llm: L, memory: ME, runtime: Runtime) -> Self {
+    pub fn new(llm: L, embedder: E, store: S, tool_registry: Arc<ToolRegistry>) -> Self {
         Self {
             llm,
-            memory,
-            runtime,
+            memory: MemoryService::new(embedder, store),
+            executor: Executor::new(tool_registry),
         }
     }
 
-    pub async fn process(&mut self, input: &str) -> Result<RuntimeResponse, AppError> {
-        let memory_ctx = self
+    pub async fn process(&mut self, input: &str) -> Result<CoreResponse, AppError> {
+        let memories = self
             .memory
             .search(input)
-            .await?
+            .await
+            .map_err(|e| AppError::LLMError(e.to_string()))?
             .into_iter()
-            .map(|m| m.content)
-            .collect();
+            .map(|m| m.clone())
+            .collect::<Vec<_>>();
 
-        let llm_response = self.llm.process(input, memory_ctx).await?;
+        let context = Context::from(memories);
 
-        let response = self.runtime.execute(llm_response.clone()).await;
+        let raw_response = self
+            .llm
+            .generate(LLMRequest {
+                messages: vec![Message::user(input)],
+                context,
+            })
+            .await?;
+
+        let llm_response =
+            LLMResponse::try_from(raw_response).map_err(|e| AppError::LLMError(e.to_string()))?;
+
+        let executor_response = if let Some(tool_calls) = llm_response.tool_call {
+            self.executor.execute(tool_calls).await
+        } else {
+            Ok(ExecutorResponse::new(vec![]))
+        };
 
         if let Some(memory_candidates) = llm_response.memory_candidates {
             for mem in memory_candidates {
@@ -46,6 +71,23 @@ where
             }
         }
 
-        response.map_err(|e| AppError::RuntimeError(e.to_string()))
+        let tool_call_result = executor_response
+            .ok()
+            .map(|r| r.action_results)
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|r| {
+                if let Some(res) = r.ok() {
+                    Some(res)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        Ok(CoreResponse {
+            response: llm_response.response,
+            tool_call_result,
+        })
     }
 }

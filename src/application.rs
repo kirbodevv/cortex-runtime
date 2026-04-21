@@ -6,12 +6,12 @@ use genai::{
 };
 
 use crate::{
-    app::{core::Core, runtime::Runtime},
-    infrastructure::{memory::Memory, module::Modules, openai::OpenAi},
+    app::{core::Core, tools::ToolRegistry},
+    infrastructure::{embedder::OpenAiEmbedder, llm::OpenAIClient, memory::InMemoryStore},
     modules::echo::EchoModule,
 };
 
-pub fn build() -> Core<OpenAi, Memory> {
+pub fn build() -> Core<OpenAIClient, OpenAiEmbedder, InMemoryStore> {
     dotenvy::dotenv().ok();
 
     let auth_resolver =
@@ -26,13 +26,13 @@ pub fn build() -> Core<OpenAi, Memory> {
 
     let client = Client::builder().with_auth_resolver(auth_resolver).build();
 
-    let mut modules = Modules::new();
-    modules.register(Box::new(EchoModule));
-    let modules = Arc::new(modules);
+    let mut tools = ToolRegistry::new();
+    tools.register(Box::new(EchoModule));
+    let tools = Arc::new(tools);
 
-    Core::new(
-        OpenAi::new(client.clone(), modules.clone()),
-        Memory::new(client),
-        Runtime::new(modules),
-    )
+    let llm_client = OpenAIClient::new(client.clone(), tools.clone());
+    let embedder = OpenAiEmbedder::new(client.clone());
+    let memory = InMemoryStore::new();
+
+    Core::new(llm_client, embedder, memory, tools)
 }

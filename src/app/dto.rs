@@ -1,29 +1,10 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::services::module::ModuleResult;
-
-#[derive(Deserialize, Serialize, Clone)]
-pub struct LLMResponse {
-    pub response: String,
-    pub actions: Option<Vec<Action>>,
-    #[serde(rename = "mem")]
-    pub memory_candidates: Option<Vec<MemoryCandidate>>,
-}
-
-pub struct RuntimeResponse {
-    pub response: String,
-    pub action_results: Vec<ModuleResult>,
-}
-
-impl RuntimeResponse {
-    pub fn new(response: String, action_results: Vec<ModuleResult>) -> Self {
-        Self {
-            response,
-            action_results,
-        }
-    }
-}
+use crate::{
+    app::tools::{ToolResponse, ToolResult},
+    domain::LLMRawResponse,
+};
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Action {
@@ -36,4 +17,35 @@ pub struct Action {
 pub struct MemoryCandidate {
     pub summary: String,
     pub importance: f32,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct LLMResponse {
+    pub response: String,
+    pub tool_call: Option<Vec<Action>>,
+    #[serde(rename = "mem")]
+    pub memory_candidates: Option<Vec<MemoryCandidate>>,
+}
+
+pub struct CoreResponse {
+    pub response: String,
+    pub tool_call_result: Vec<ToolResponse>,
+}
+
+pub struct ExecutorResponse {
+    pub action_results: Vec<ToolResult>,
+}
+
+impl TryFrom<LLMRawResponse> for LLMResponse {
+    type Error = serde_json::Error;
+
+    fn try_from(value: LLMRawResponse) -> Result<Self, Self::Error> {
+        serde_json::from_str::<Self>(&value.text)
+    }
+}
+
+impl ExecutorResponse {
+    pub fn new(action_results: Vec<ToolResult>) -> Self {
+        Self { action_results }
+    }
 }

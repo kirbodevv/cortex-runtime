@@ -1,11 +1,8 @@
-use crate::services::module::ModuleResponse;
-
 mod app;
 mod application;
 mod domain;
 mod infrastructure;
 mod modules;
-mod services;
 
 #[tokio::main]
 async fn main() {
@@ -20,13 +17,9 @@ async fn main() {
                 println!(
                     "> {} Modules res: {}",
                     res.response,
-                    res.action_results
+                    res.tool_call_result
                         .into_iter()
-                        .map(|r| r
-                            .unwrap_or(ModuleResponse {
-                                message: "module error".to_string()
-                            })
-                            .message)
+                        .map(|r| r.message)
                         .collect::<Vec<_>>()
                         .join(", ")
                 )

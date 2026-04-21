@@ -4,44 +4,54 @@ use genai::{
     Client,
     chat::{ChatMessage, ChatOptions, ChatRequest, JsonSpec},
 };
-use serde_json::{from_str, json};
+use serde_json::json;
 
 use crate::{
-    app::dto::LLMResponse,
-    domain::error::AppError,
-    services::{llm::LLMService, module::ModuleService},
+    app::{ports::LLMClient, tools::ToolRegistry},
+    domain::{LLMRawResponse, LLMRequest, error::AppError},
 };
 
-pub struct OpenAi {
+pub struct OpenAIClient {
     client: Client,
     messages: ChatRequest,
-    module: Arc<dyn ModuleService>,
+    tools: Arc<ToolRegistry>,
 }
 
-impl OpenAi {
-    pub fn new(client: Client, module: Arc<dyn ModuleService>) -> Self {
+impl OpenAIClient {
+    pub fn new(client: Client, tools: Arc<ToolRegistry>) -> Self {
         Self {
             client,
             messages: ChatRequest::new(vec![ChatMessage::system(
                 "НИКОГДА НЕ ОТВЕЧАЙ ПОЛЬЗОВАТЕЛЮ ПРОСТЫМ ТЕКСТОМ. НЕ ЗАПИСЫВАЙ В ПАМЯТЬ ТО, ЧТО УЖЕ ЗАПИСАНО.",
             )]),
-            module,
+            tools,
         }
     }
 }
 
-impl LLMService for OpenAi {
-    async fn process(
-        &mut self,
-        input: &str,
-        context: Vec<String>,
-    ) -> Result<LLMResponse, AppError> {
+#[async_trait::async_trait]
+impl LLMClient for OpenAIClient {
+    async fn generate(&self, req: LLMRequest) -> Result<LLMRawResponse, AppError> {
+        let input = &req
+            .messages
+            .last()
+            .ok_or(AppError::RuntimeError("No messages".to_string()))?
+            .content;
+
         let messages = self.messages.clone().append_messages(vec![
-            ChatMessage::user(format!("Из памяти:\n{}", context.join("\n"))),
-            ChatMessage::user(input.to_string()),
+            ChatMessage::user(format!(
+                "Из памяти:\n{}",
+                req.context
+                    .get()
+                    .iter()
+                    .map(|m| m.content())
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            )),
+            ChatMessage::user(input),
         ]);
 
-        let any_of = self.module.get_modules_schema(input);
+        let any_of = self.tools.get_modules_json_schema(input);
         let should_use_modules = !any_of.is_empty();
 
         let items = if should_use_modules {
@@ -104,6 +114,8 @@ impl LLMService for OpenAi {
             content: content.clone(),
         });*/
 
-        Ok(from_str::<LLMResponse>(message).map_err(|e| AppError::LLMError(e.to_string()))?)
+        Ok(LLMRawResponse {
+            text: message.to_string(),
+        })
     }
 }
