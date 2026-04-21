@@ -8,7 +8,7 @@ use genai::{
 use crate::{
     app::{core::Core, tools::ToolRegistry},
     infrastructure::{embedder::OpenAiEmbedder, llm::OpenAIClient, memory::InMemoryStore},
-    modules::echo::EchoModule,
+    tools::echo::EchoModule,
 };
 
 pub fn build() -> Core<OpenAIClient, OpenAiEmbedder, InMemoryStore> {
