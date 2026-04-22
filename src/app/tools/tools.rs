@@ -49,7 +49,6 @@ impl ToolRegistry {
                 }
             })
             .collect();
-        println!("[INFO] Использованы модули: {:?}", used_modules);
         modules
     }
 }
