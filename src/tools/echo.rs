@@ -7,11 +7,12 @@ use crate::app::{
 
 pub struct EchoModule;
 
+#[async_trait::async_trait]
 impl Tool for EchoModule {
     fn name(&self) -> &str {
         "echo"
     }
-    fn description(&self) -> Value {
+    fn args_schema(&self) -> Value {
         json!(
         {
             "type": "object",
@@ -32,18 +33,16 @@ impl Tool for EchoModule {
         )
     }
 
-    fn keywords(&self) -> &[&str] {
-        &["echo", "эхо", "консоль", "вывести", "текст"]
+    fn keywords(&self) -> Vec<&str> {
+        vec!["echo", "эхо", "консоль", "вывести", "текст"]
     }
 
-    fn execute(&self, action: Action) -> ToolResult {
+    async fn execute(&self, action: Action) -> ToolResult {
         let message = action
             .args
             .get("message")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| {
-                ToolError::BadJSON("message field is missing or not a string".to_string())
-            })?;
+            .ok_or_else(|| ToolError::BadArgs("message is missing or not a string".to_string()))?;
 
         println!("[ECHO]: {}", message);
 

@@ -1,3 +1,4 @@
+use futures::future::join_all;
 use std::sync::Arc;
 
 use crate::app::{
@@ -15,10 +16,11 @@ impl Executor {
     }
 
     pub async fn execute(&mut self, actions: Vec<Action>) -> ExecutorResponse {
-        let action_results = actions
+        let futures = actions
             .into_iter()
-            .map(|action| self.tool_registry.execute(action))
-            .collect();
+            .map(|action| self.tool_registry.execute(action));
+
+        let action_results = join_all(futures).await;
 
         ExecutorResponse::new(action_results)
     }

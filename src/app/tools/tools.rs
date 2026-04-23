@@ -24,7 +24,7 @@ impl ToolRegistry {
         self.tools.push(module);
     }
 
-    pub fn execute(&self, action: Action) -> Result<ToolResponse, ToolError> {
+    pub async fn execute(&self, action: Action) -> Result<ToolResponse, ToolError> {
         let tool = self
             .tools
             .iter()
@@ -33,7 +33,7 @@ impl ToolRegistry {
                 name: action.action_type.clone(),
             })?;
 
-        tool.execute(action)
+        tool.execute(action).await
     }
 
     pub fn get_modules_json_schema(&self, query: &str) -> Vec<Value> {
@@ -44,8 +44,9 @@ impl ToolRegistry {
             .iter()
             .filter_map(|m| {
                 if m.keywords().iter().any(|w| words.contains(w)) {
+                    println!("[SEARCH] Found module: {}", m.name());
                     used_modules.push(m.name());
-                    Some(m.description())
+                    Some(m.args_schema())
                 } else {
                     None
                 }

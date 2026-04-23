@@ -6,12 +6,16 @@ use genai::{
 };
 
 use crate::{
-    app::{core::Core, tools::ToolRegistry},
+    app::{
+        core::Core,
+        tools::{ToolProvider, ToolRegistry},
+    },
     infrastructure::{embedder::OpenAiEmbedder, llm::OpenAIClient, memory::InMemoryStore},
-    tools::echo::EchoModule,
 };
 
-pub fn build() -> Core<OpenAIClient, OpenAiEmbedder, InMemoryStore> {
+pub async fn build(
+    tool_providers: Vec<Box<dyn ToolProvider>>,
+) -> Core<OpenAIClient, OpenAiEmbedder, InMemoryStore> {
     dotenvy::dotenv().ok();
 
     let auth_resolver =
@@ -26,9 +30,18 @@ pub fn build() -> Core<OpenAIClient, OpenAiEmbedder, InMemoryStore> {
 
     let client = Client::builder().with_auth_resolver(auth_resolver).build();
 
-    let mut tools = ToolRegistry::new();
-    tools.register(Box::new(EchoModule));
-    let tools = Arc::new(tools);
+    let mut tool_registry = ToolRegistry::new();
+
+    let futures = tool_providers.iter().map(|p| p.load_tools());
+    let results = futures::future::join_all(futures).await;
+
+    for tools in results {
+        for tool in tools {
+            tool_registry.register(tool);
+        }
+    }
+
+    let tools = Arc::new(tool_registry);
 
     let llm_client = OpenAIClient::new(client.clone(), tools.clone());
     let embedder = OpenAiEmbedder::new(client.clone());

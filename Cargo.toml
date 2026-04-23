@@ -6,8 +6,10 @@ edition = "2024"
 [dependencies]
 async-trait = "0.1.89"
 chrono = "0.4.44"
+clap = { version = "4.6.1", features = ["derive"] }
 derive_more = "2.1.1"
 dotenvy = "0.15.7"
+futures = "0.3.32"
 genai = "0.5.3"
 openai_api_rust = "0.1.9"
 serde = { version = "1.0.228", features = ["derive"] }
