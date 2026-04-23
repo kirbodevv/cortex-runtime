@@ -7,8 +7,11 @@ use genai::{
 use serde_json::json;
 
 use crate::{
-    app::{ports::LLMClient, tools::ToolRegistry},
-    domain::{LLMRawResponse, LLMRequest, error::AppError},
+    app::{
+        ports::{LLMClient, LLMError},
+        tools::ToolRegistry,
+    },
+    domain::{LLMRawResponse, LLMRequest},
 };
 
 pub struct OpenAIClient {
@@ -31,17 +34,13 @@ impl OpenAIClient {
 
 #[async_trait::async_trait]
 impl LLMClient for OpenAIClient {
-    async fn generate(&self, req: LLMRequest) -> Result<LLMRawResponse, AppError> {
-        let input = &req
-            .messages
-            .last()
-            .ok_or(AppError::RuntimeError("No messages".to_string()))?
-            .content;
+    async fn generate(&self, req: LLMRequest) -> Result<LLMRawResponse, LLMError> {
+        let input = &req.messages().last().unwrap().content;
 
         let messages = self.messages.clone().append_messages(vec![
             ChatMessage::user(format!(
                 "Из памяти:\n{}",
-                req.context
+                req.context()
                     .get()
                     .iter()
                     .map(|m| m.content())
@@ -86,12 +85,12 @@ impl LLMClient for OpenAIClient {
                 "additionalProperties": false
               }
             },
-            "actions": {
+            "tool_call": {
                 "type": "array",
                 "items": items
             }
           },
-          "required": ["response", "mem", "actions"],
+          "required": ["response", "mem", "tool_call"],
           "additionalProperties": false
         });
 
@@ -102,12 +101,9 @@ impl LLMClient for OpenAIClient {
             .client
             .exec_chat("gpt-4o-mini", messages, Some(&chat_options))
             .await
-            .map_err(|e| AppError::LLMError(e.to_string()))?;
+            .map_err(|e| LLMError::ApiError(Box::new(e)))?;
 
-        let message = rs.first_text();
-        let message = message
-            .as_ref()
-            .ok_or_else(|| AppError::LLMError("No message in response".to_string()))?;
+        let message = rs.first_text().ok_or(LLMError::EmptyResponse)?;
 
         /*self.messages.push(Message {
             role: Role::Assistant,

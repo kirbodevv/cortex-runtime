@@ -1,13 +1,10 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum DomainError {}
+pub enum DomainError {
+    #[error("Failed to parse LLM response: {0}")]
+    ParseResponse(#[from] serde_json::Error),
 
-#[derive(Error, Debug)]
-pub enum AppError {
-    #[error("LLM error")]
-    LLMError(String),
-
-    #[error("Runtime error")]
-    RuntimeError(String),
+    #[error("Request has no messages")]
+    EmptyRequest,
 }

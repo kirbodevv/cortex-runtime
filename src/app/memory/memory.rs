@@ -3,7 +3,8 @@ use crate::{
         dto::MemoryCandidate,
         ports::{Embedder, MemoryStore},
     },
-    domain::{AppError, MemoryItem, StoredMemory},
+    domain::{MemoryItem, StoredMemory},
+    error::AppError,
 };
 
 pub struct MemoryService<E, S>
@@ -27,9 +28,22 @@ where
     pub async fn search(&self, query: &str) -> Result<Vec<&MemoryItem>, AppError> {
         let query_vec = self.embedder.embed(query).await?;
 
-        let result = self.store.search(&query_vec, 0.3, 5).await;
+        let result = self
+            .store
+            .search(&query_vec, 0.3, 5)
+            .await
+            .map_err(|e| AppError::Memory(e))?;
 
         let items = result.iter().map(|(item, _)| *item).collect::<Vec<_>>();
+
+        println!(
+            "[INFO MEM] added to context: {}",
+            items
+                .iter()
+                .map(|i| i.content())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
 
         Ok(items)
     }
@@ -41,9 +55,14 @@ where
                 .embedder
                 .embed(&memory.summary)
                 .await
-                .map_err(|e| AppError::LLMError(e.to_string()))?;
+                .map_err(|e| AppError::Embedder(e))?;
 
-            self.store.insert(StoredMemory { item, embedding }).await;
+            self.store
+                .insert(StoredMemory { item, embedding })
+                .await
+                .map_err(|e| AppError::Memory(e))?;
+
+            println!("[INFO MEM] saved memory: {}", memory.summary);
         }
         Ok(())
     }

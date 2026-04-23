@@ -24,12 +24,14 @@ impl ToolRegistry {
         self.tools.push(module);
     }
 
-    pub fn execute(&self, action: Action) -> ToolResult {
+    pub fn execute(&self, action: Action) -> Result<ToolResponse, ToolError> {
         let tool = self
             .tools
             .iter()
             .find(|t| t.name() == action.action_type)
-            .ok_or(ToolError::NotFound)?;
+            .ok_or_else(|| ToolError::NotFound {
+                name: action.action_type.clone(),
+            })?;
 
         tool.execute(action)
     }

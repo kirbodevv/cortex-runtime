@@ -1,6 +1,7 @@
 mod app;
 mod application;
 mod domain;
+mod error;
 mod infrastructure;
 mod tools;
 

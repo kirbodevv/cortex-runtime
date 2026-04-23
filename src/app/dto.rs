@@ -3,7 +3,7 @@ use serde_json::Value;
 
 use crate::{
     app::tools::{ToolResponse, ToolResult},
-    domain::LLMRawResponse,
+    domain::{DomainError, LLMRawResponse},
 };
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -37,10 +37,10 @@ pub struct ExecutorResponse {
 }
 
 impl TryFrom<LLMRawResponse> for LLMResponse {
-    type Error = serde_json::Error;
+    type Error = DomainError;
 
     fn try_from(value: LLMRawResponse) -> Result<Self, Self::Error> {
-        serde_json::from_str::<Self>(&value.text)
+        serde_json::from_str::<Self>(&value.text).map_err(|e| DomainError::ParseResponse(e))
     }
 }
 

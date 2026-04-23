@@ -1,7 +1,9 @@
+use std::cmp::Ordering;
+
 use similarity::{Similarity, similarity_traits::CosineSimilarity};
 
 use crate::{
-    app::ports::MemoryStore,
+    app::ports::{MemoryStore, MemoryStoreError},
     domain::{MemoryItem, StoredMemory},
 };
 
@@ -19,21 +21,28 @@ impl InMemoryStore {
 
 #[async_trait::async_trait]
 impl MemoryStore for InMemoryStore {
-    async fn insert(&mut self, memory: StoredMemory) {
+    async fn insert(&mut self, memory: StoredMemory) -> Result<(), MemoryStoreError> {
         self.memories.push(memory);
+        Ok(())
     }
 
-    async fn search(&self, query: &[f32], threshold: f64, top_k: usize) -> Vec<(&MemoryItem, f64)> {
+    async fn search(
+        &self,
+        query: &[f32],
+        threshold: f64,
+        top_k: usize,
+    ) -> Result<Vec<(&MemoryItem, f64)>, MemoryStoreError> {
         let mut items = self
             .memories
             .iter()
             .map(|m| {
-                let sim = CosineSimilarity::similarity((&query, &m.embedding)).unwrap_or(0.0);
-                (&m.item, sim)
+                let sim = CosineSimilarity::similarity((&query, &m.embedding))
+                    .ok_or(MemoryStoreError::SimilarityError)?;
+                Ok((&m.item, sim))
             })
-            .collect::<Vec<(&MemoryItem, f64)>>();
+            .collect::<Result<Vec<_>, _>>()?;
 
-        items.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        items.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
 
         let top_k: Vec<(&MemoryItem, f64)> = items
             .into_iter()
@@ -47,6 +56,6 @@ impl MemoryStore for InMemoryStore {
             })
             .collect();
 
-        top_k
+        Ok(top_k)
     }
 }

@@ -40,10 +40,13 @@ impl Tool for EchoModule {
         let message = action
             .args
             .get("message")
-            .ok_or(ToolError::JSON("Bad json".to_string()))?
-            .as_str()
-            .unwrap_or("");
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                ToolError::BadJSON("message field is missing or not a string".to_string())
+            })?;
+
         println!("[ECHO]: {}", message);
+
         Ok(ToolResponse {
             message: message.to_string(),
         })
