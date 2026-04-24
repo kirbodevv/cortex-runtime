@@ -10,11 +10,11 @@ pub struct LLMRawResponse {
 }
 
 impl LLMRequest {
-    pub fn new(messages: Vec<Message>, context: Context) -> Result<Self, DomainError> {
-        if messages.is_empty() {
-            return Err(DomainError::EmptyRequest);
-        }
-        Ok(Self { messages, context })
+    pub fn new(messages: &[Message], context: Context) -> Result<Self, DomainError> {
+        Ok(Self {
+            messages: messages.to_vec(),
+            context,
+        })
     }
 
     pub fn messages(&self) -> &[Message] {

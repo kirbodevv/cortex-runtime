@@ -4,7 +4,4 @@ use thiserror::Error;
 pub enum DomainError {
     #[error("Failed to parse LLM response: {0}")]
     ParseResponse(#[from] serde_json::Error),
-
-    #[error("Request has no messages")]
-    EmptyRequest,
 }

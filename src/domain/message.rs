@@ -1,8 +1,10 @@
+#[derive(Clone)]
 pub enum Role {
     User,
     Assistant,
 }
 
+#[derive(Clone)]
 pub struct Message {
     pub role: Role,
     pub content: String,

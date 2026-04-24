@@ -11,46 +11,64 @@ use crate::{
         ports::{LLMClient, LLMError},
         tools::ToolRegistry,
     },
-    domain::{LLMRawResponse, LLMRequest},
+    domain::{Context, LLMRawResponse, LLMRequest, Message, Role},
 };
 
 pub struct OpenAIClient {
     client: Client,
-    messages: ChatRequest,
     tools: Arc<ToolRegistry>,
 }
 
 impl OpenAIClient {
     pub fn new(client: Client, tools: Arc<ToolRegistry>) -> Self {
-        Self {
-            client,
-            messages: ChatRequest::new(vec![ChatMessage::system(
-                "НИКОГДА НЕ ОТВЕЧАЙ ПОЛЬЗОВАТЕЛЮ ПРОСТЫМ ТЕКСТОМ. НЕ ЗАПИСЫВАЙ В ПАМЯТЬ ТО, ЧТО УЖЕ ЗАПИСАНО.",
-            )]),
-            tools,
+        Self { client, tools }
+    }
+}
+
+impl From<&Message> for ChatMessage {
+    fn from(message: &Message) -> Self {
+        match message.role {
+            Role::User => ChatMessage::user(message.content.clone()),
+            Role::Assistant => ChatMessage::assistant(message.content.clone()),
         }
     }
+}
+
+fn format_memory_and_input(ctx: &Context, input: &str) -> String {
+    format!(
+        "From memory:\n{}\n\nUser message:\n{}",
+        ctx.get()
+            .iter()
+            .map(|m| m.content())
+            .collect::<Vec<_>>()
+            .join("\n"),
+        input
+    )
 }
 
 #[async_trait::async_trait]
 impl LLMClient for OpenAIClient {
     async fn generate(&self, req: LLMRequest) -> Result<LLMRawResponse, LLMError> {
-        let input = &req.messages().last().unwrap().content;
+        let context = req.context();
 
-        let messages = self.messages.clone().append_messages(vec![
-            ChatMessage::user(format!(
-                "Из памяти:\n{}",
-                req.context()
-                    .get()
-                    .iter()
-                    .map(|m| m.content())
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            )),
-            ChatMessage::user(input),
-        ]);
+        let messages = req
+            .messages()
+            .iter()
+            .enumerate()
+            .map(|(i, m)| {
+                if i == req.messages().len() - 1 {
+                    Message::user(format_memory_and_input(context, &m.content))
+                } else {
+                    m.clone()
+                }
+            })
+            .collect::<Vec<_>>();
 
-        let any_of = self.tools.get_modules_json_schema(input);
+        let request = ChatRequest::new(messages.iter().map(|m| m.into()).collect());
+
+        let any_of = self
+            .tools
+            .get_modules_json_schema(&req.messages().last().unwrap().content);
         let should_use_modules = !any_of.is_empty();
 
         let items = if should_use_modules {
@@ -99,16 +117,11 @@ impl LLMClient for OpenAIClient {
 
         let rs = self
             .client
-            .exec_chat("gpt-4o-mini", messages, Some(&chat_options))
+            .exec_chat("gpt-4o-mini", request, Some(&chat_options))
             .await
             .map_err(|e| LLMError::ApiError(Box::new(e)))?;
 
         let message = rs.first_text().ok_or(LLMError::EmptyResponse)?;
-
-        /*self.messages.push(Message {
-            role: Role::Assistant,
-            content: content.clone(),
-        });*/
 
         Ok(LLMRawResponse {
             text: message.to_string(),

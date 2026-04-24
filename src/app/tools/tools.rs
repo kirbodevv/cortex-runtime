@@ -44,7 +44,6 @@ impl ToolRegistry {
             .iter()
             .filter_map(|m| {
                 if m.keywords().iter().any(|w| words.contains(w)) {
-                    println!("[SEARCH] Found module: {}", m.name());
                     used_modules.push(m.name());
                     Some(m.args_schema())
                 } else {

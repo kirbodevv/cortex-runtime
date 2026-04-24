@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use crate::{
     app::{
@@ -6,11 +6,14 @@ use crate::{
         executor::Executor,
         memory::memory::MemoryService,
         ports::{Embedder, LLMClient, MemoryStore},
+        session::ChatSession,
         tools::ToolRegistry,
     },
     domain::{Context, LLMRequest, Message},
     error::AppError,
 };
+
+const SESSION_TIMEOUT: Duration = Duration::from_secs(300);
 
 pub struct Core<L, E, S>
 where
@@ -21,6 +24,7 @@ where
     llm: L,
     memory: MemoryService<E, S>,
     executor: Executor,
+    session: ChatSession,
 }
 
 impl<L, E, S> Core<L, E, S>
@@ -34,6 +38,7 @@ where
             llm,
             memory: MemoryService::new(embedder, store),
             executor: Executor::new(tool_registry),
+            session: ChatSession::new(),
         }
     }
 
@@ -45,11 +50,23 @@ where
             .into_iter()
             .map(|m| m.clone())
             .collect::<Vec<_>>();
+
+        if self.session.timeout(SESSION_TIMEOUT) {
+            self.session.clear();
+            println!("[INFO] Chat history cleared due to inactivity");
+        }
+
+        self.session.append(Message::user(input));
+
+        let messages = self.session.messages();
         let context = Context::from(memories);
-        let request = LLMRequest::new(vec![Message::user(input)], context)?;
+        let request = LLMRequest::new(messages, context)?;
 
         let raw_response = self.llm.generate(request).await?;
         let llm_response = LLMResponse::try_from(raw_response)?;
+
+        self.session
+            .append(Message::assistant(llm_response.response.clone()));
 
         let executor_response = if let Some(tool_calls) = llm_response.tool_call {
             self.executor.execute(tool_calls).await
