@@ -21,12 +21,15 @@ struct Args {
 
 #[tokio::main]
 async fn main() {
-    let mut tool_providers: Vec<Box<dyn ToolProvider>> = vec![Box::new(InternalToolProvider)];
-
     let args = Args::parse();
-    for path in args.tools {
-        tool_providers.push(Box::new(ExternalToolProvider { dir: path }));
-    }
+
+    let tool_providers = {
+        let mut providers: Vec<Box<dyn ToolProvider>> = vec![Box::new(InternalToolProvider)];
+        for path in args.tools {
+            providers.push(Box::new(ExternalToolProvider { dir: path }));
+        }
+        providers
+    };
 
     let mut core = application::build(tool_providers).await;
 
