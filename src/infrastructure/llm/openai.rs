@@ -89,7 +89,7 @@ impl LLMClient for OpenAIClient {
             },
             "mem": {
               "type": "array",
-              "description": "Write only if there is a relevant memory to store.",
+              "description": "Store only relevant memories in user's language",
               "items": {
                 "type": "object",
                 "properties": {
