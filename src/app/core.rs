@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use crate::{
     app::{
@@ -12,8 +12,6 @@ use crate::{
     domain::{Context, LLMRequest, Message},
     error::AppError,
 };
-
-const SESSION_TIMEOUT: Duration = Duration::from_secs(300);
 
 pub struct Core<L, E, S>
 where
@@ -51,11 +49,6 @@ where
             .map(|m| m.clone())
             .collect::<Vec<_>>();
 
-        if self.session.timeout(SESSION_TIMEOUT) {
-            self.session.clear();
-            println!("[INFO] Chat history cleared due to inactivity");
-        }
-
         self.session.append(Message::user(input));
 
         let messages = self.session.messages();
@@ -90,5 +83,10 @@ where
             response: llm_response.response,
             tool_call_result,
         })
+    }
+
+    pub async fn clear_session(&mut self) {
+        println!("[INFO] Clearing session");
+        self.session.clear();
     }
 }

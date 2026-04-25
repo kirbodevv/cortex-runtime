@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use crate::domain::Message;
 
@@ -22,10 +22,6 @@ impl ChatSession {
 
     pub fn messages(&self) -> &[Message] {
         &self.messages
-    }
-
-    pub fn timeout(&self, timeout: Duration) -> bool {
-        self.last_activity.elapsed() > timeout
     }
 
     pub fn clear(&mut self) {

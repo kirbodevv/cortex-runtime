@@ -37,6 +37,11 @@ async fn main() {
         let mut input = String::new();
         std::io::stdin().read_line(&mut input).unwrap();
 
+        if input.trim() == "clear" {
+            core.clear_session().await;
+            continue;
+        }
+
         match core.process(input.as_str()).await {
             Ok(res) => {
                 println!(
