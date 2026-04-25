@@ -58,4 +58,21 @@ impl MemoryStore for InMemoryStore {
 
         Ok(top_k)
     }
+
+    async fn max_similarity(&self, query: &[f32]) -> Result<(&MemoryItem, f64), MemoryStoreError> {
+        let max_sim = {
+            let mut max_sim: Option<(&MemoryItem, f64)> = None;
+            for memory in &self.memories {
+                let sim = CosineSimilarity::similarity((&query, &memory.embedding))
+                    .ok_or(MemoryStoreError::SimilarityError)?;
+
+                if max_sim.is_none() || sim > max_sim.unwrap().1 {
+                    max_sim = Some((&memory.item, sim));
+                }
+            }
+            max_sim
+        };
+
+        max_sim.ok_or(MemoryStoreError::SimilarityError)
+    }
 }

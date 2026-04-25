@@ -19,4 +19,5 @@ pub trait MemoryStore: Send + Sync {
         threshold: f64,
         top_k: usize,
     ) -> Result<Vec<(&MemoryItem, f64)>, MemoryStoreError>;
+    async fn max_similarity(&self, query: &[f32]) -> Result<(&MemoryItem, f64), MemoryStoreError>;
 }

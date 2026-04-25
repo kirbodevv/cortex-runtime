@@ -49,21 +49,32 @@ where
     }
 
     pub async fn save(&mut self, memory: MemoryCandidate) -> Result<(), AppError> {
-        if memory.importance > 0.6 {
-            let item = MemoryItem::new(&memory.summary);
-            let embedding = self
-                .embedder
-                .embed(&memory.summary)
-                .await
-                .map_err(|e| AppError::Embedder(e))?;
-
-            self.store
-                .insert(StoredMemory { item, embedding })
-                .await
-                .map_err(|e| AppError::Memory(e))?;
-
-            println!("[INFO MEM] saved memory: {}", memory.summary);
+        if memory.importance < 0.6 {
+            return Ok(());
         }
+
+        let embedding = self
+            .embedder
+            .embed(&memory.summary)
+            .await
+            .map_err(|e| AppError::Embedder(e))?;
+
+        if let Ok((mem, similarity)) = self.store.max_similarity(&embedding).await {
+            if similarity > 0.9 {
+                println!("[INFO MEM] skipped similar memory: {}", mem.content());
+                return Ok(());
+            }
+        }
+
+        let item = MemoryItem::new(&memory.summary);
+
+        self.store
+            .insert(StoredMemory { item, embedding })
+            .await
+            .map_err(|e| AppError::Memory(e))?;
+
+        println!("[INFO MEM] saved memory: {}", memory.summary);
+
         Ok(())
     }
 }
