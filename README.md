@@ -118,6 +118,14 @@ cd cortex-runtime
 cargo run
 ```
 
+If you want to test external tools, please use the --tools flag:
+
+```bash
+cargo run -- --tools example_tools
+// Or if you have the binary
+cortex-runtime --tools example_tools
+```
+
 ---
 
 ## Roadmap
