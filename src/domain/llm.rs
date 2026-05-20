@@ -1,8 +1,10 @@
-use crate::domain::{Context, DomainError, Message};
+use serde_json::Value;
+
+use crate::domain::Message;
 
 pub struct LLMRequest {
-    messages: Vec<Message>,
-    context: Context,
+    pub messages: Vec<Message>,
+    pub json_schema: Value,
 }
 
 pub struct LLMRawResponse {
@@ -10,18 +12,10 @@ pub struct LLMRawResponse {
 }
 
 impl LLMRequest {
-    pub fn new(messages: &[Message], context: Context) -> Result<Self, DomainError> {
-        Ok(Self {
+    pub fn new(messages: &[Message], json_schema: Value) -> Self {
+        Self {
             messages: messages.to_vec(),
-            context,
-        })
-    }
-
-    pub fn messages(&self) -> &[Message] {
-        &self.messages
-    }
-
-    pub fn context(&self) -> &Context {
-        &self.context
+            json_schema,
+        }
     }
 }

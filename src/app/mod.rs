@@ -1,7 +1,9 @@
 pub mod core;
 pub mod dto;
 pub mod executor;
+pub mod json_schema;
 pub mod memory;
 pub mod ports;
+pub mod prompt;
 pub mod session;
 pub mod tools;

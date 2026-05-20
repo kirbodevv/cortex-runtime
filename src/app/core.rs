@@ -4,12 +4,14 @@ use crate::{
     app::{
         dto::{CoreResponse, ExecutorResponse, LLMResponse},
         executor::Executor,
+        json_schema::JsonSchemaGenerator,
         memory::memory::MemoryService,
         ports::{Embedder, LLMClient, MemoryStore},
+        prompt::PromptBuilder,
         session::ChatSession,
         tools::ToolRegistry,
     },
-    domain::{Context, LLMRequest, Message},
+    domain::{LLMRequest, Message},
     error::AppError,
 };
 
@@ -23,6 +25,8 @@ where
     memory: MemoryService<E, S>,
     executor: Executor,
     session: ChatSession,
+    prompt_builder: PromptBuilder,
+    json_schema: JsonSchemaGenerator,
 }
 
 impl<L, E, S> Core<L, E, S>
@@ -35,8 +39,23 @@ where
         Self {
             llm,
             memory: MemoryService::new(embedder, store),
-            executor: Executor::new(tool_registry),
+            executor: Executor::new(tool_registry.clone()),
             session: ChatSession::new(),
+            prompt_builder: PromptBuilder::new(
+                r#"
+                Store ONLY:
+                - stable user facts
+                - preferences
+                - long-term state
+
+                DO NOT store:
+                - greetings
+                - corrections
+                - meta discussion about memory
+                - system behavior
+                "#,
+            ),
+            json_schema: JsonSchemaGenerator::new(tool_registry),
         }
     }
 
@@ -51,9 +70,10 @@ where
 
         self.session.append(Message::user(input));
 
-        let messages = self.session.messages();
-        let context = Context::from(memories);
-        let request = LLMRequest::new(messages, context)?;
+        let messages = &self.prompt_builder.build(&self.session, &memories);
+        let json_schema = self.json_schema.generate(input);
+
+        let request = LLMRequest::new(messages, json_schema);
 
         let raw_response = self.llm.generate(request).await?;
         let llm_response = LLMResponse::try_from(raw_response)?;

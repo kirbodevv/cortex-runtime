@@ -43,7 +43,7 @@ pub async fn build(
 
     let tools = Arc::new(tool_registry);
 
-    let llm_client = OpenAIClient::new(client.clone(), tools.clone());
+    let llm_client = OpenAIClient::new(client.clone());
     let embedder = OpenAiEmbedder::new(client.clone());
     let memory = InMemoryStore::new();
 
