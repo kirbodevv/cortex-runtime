@@ -10,21 +10,18 @@ use crate::{
         core::Core,
         tools::{ToolProvider, ToolRegistry},
     },
+    config::core::CortexConfig,
     infrastructure::{embedder::OpenAiEmbedder, llm::OpenAIClient, memory::InMemoryStore},
 };
 
 pub async fn build(
     tool_providers: Vec<Box<dyn ToolProvider>>,
 ) -> Core<OpenAIClient, OpenAiEmbedder, InMemoryStore> {
-    dotenvy::dotenv().ok();
+    let config = Arc::new(CortexConfig::from_env());
 
+    let key = config.openai_api_key.clone();
     let auth_resolver =
         AuthResolver::from_resolver_fn(|_| -> Result<Option<AuthData>, genai::resolver::Error> {
-            let key = dotenvy::var("OPENAI_API_KEY").map_err(|_| {
-                genai::resolver::Error::ApiKeyEnvNotFound {
-                    env_name: "OPENAI_API_KEY".to_string(),
-                }
-            })?;
             Ok(Some(AuthData::from_single(key)))
         });
 
@@ -47,5 +44,5 @@ pub async fn build(
     let embedder = OpenAiEmbedder::new(client.clone());
     let memory = InMemoryStore::new();
 
-    Core::new(llm_client, embedder, memory, tools)
+    Core::new(config, llm_client, embedder, memory, tools)
 }

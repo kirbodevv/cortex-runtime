@@ -1,8 +1,11 @@
+use std::sync::Arc;
+
 use crate::{
     app::{
         dto::MemoryCandidate,
         ports::{Embedder, MemoryStore},
     },
+    config::core::CortexConfig,
     domain::{MemoryItem, StoredMemory},
     error::AppError,
 };
@@ -12,6 +15,7 @@ where
     E: Embedder,
     S: MemoryStore,
 {
+    config: Arc<CortexConfig>,
     embedder: E,
     store: S,
 }
@@ -21,8 +25,12 @@ where
     E: Embedder,
     S: MemoryStore,
 {
-    pub fn new(embedder: E, store: S) -> Self {
-        Self { embedder, store }
+    pub fn new(config: Arc<CortexConfig>, embedder: E, store: S) -> Self {
+        Self {
+            config,
+            embedder,
+            store,
+        }
     }
 
     pub async fn search(&self, query: &str) -> Result<Vec<&MemoryItem>, AppError> {
@@ -30,7 +38,11 @@ where
 
         let result = self
             .store
-            .search(&query_vec, 0.3, 5)
+            .search(
+                &query_vec,
+                self.config.memory_threshold,
+                self.config.memory_top_k,
+            )
             .await
             .map_err(|e| AppError::Memory(e))?;
 
@@ -49,7 +61,7 @@ where
     }
 
     pub async fn save(&mut self, memory: MemoryCandidate) -> Result<(), AppError> {
-        if memory.importance < 0.6 {
+        if memory.importance < self.config.memory_importance_threshold {
             return Ok(());
         }
 

@@ -1,17 +1,20 @@
+use std::sync::Arc;
+
 use crate::{
     app::session::ChatSession,
+    config::core::CortexConfig,
     domain::{MemoryItem, Message},
 };
 
-const RECENT_MESSAGE_COUNT: usize = 10;
-
 pub struct PromptBuilder {
+    config: Arc<CortexConfig>,
     system: String,
 }
 
 impl PromptBuilder {
-    pub fn new(system: impl Into<String>) -> Self {
+    pub fn new(config: Arc<CortexConfig>, system: impl Into<String>) -> Self {
         Self {
+            config,
             system: system.into(),
         }
     }
@@ -23,7 +26,7 @@ impl PromptBuilder {
             messages.push(Message::system(format!("Memory: {}", m.content())));
         }
 
-        messages.extend(session.recent(RECENT_MESSAGE_COUNT).to_vec());
+        messages.extend(session.recent(self.config.context_window_size).to_vec());
 
         messages
     }

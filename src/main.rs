@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 mod app;
 mod application;
+mod config;
 mod domain;
 mod error;
 mod infrastructure;

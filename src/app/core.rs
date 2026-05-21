@@ -11,6 +11,7 @@ use crate::{
         session::ChatSession,
         tools::ToolRegistry,
     },
+    config::core::CortexConfig,
     domain::{LLMRequest, Message},
     error::AppError,
 };
@@ -35,13 +36,20 @@ where
     E: Embedder,
     S: MemoryStore,
 {
-    pub fn new(llm: L, embedder: E, store: S, tool_registry: Arc<ToolRegistry>) -> Self {
+    pub fn new(
+        config: Arc<CortexConfig>,
+        llm: L,
+        embedder: E,
+        store: S,
+        tool_registry: Arc<ToolRegistry>,
+    ) -> Self {
         Self {
             llm,
-            memory: MemoryService::new(embedder, store),
+            memory: MemoryService::new(config.clone(), embedder, store),
             executor: Executor::new(tool_registry.clone()),
             session: ChatSession::new(),
             prompt_builder: PromptBuilder::new(
+                config,
                 r#"
                 Store ONLY:
                 - stable user facts
