@@ -43,6 +43,10 @@ where
         store: S,
         tool_registry: Arc<ToolRegistry>,
     ) -> Self {
+        let user_prompt = match config.custom_system_prompt.clone() {
+            Some(prompt) => format!("USER PROMPT: {}", prompt),
+            None => "".to_string(),
+        };
         Self {
             llm,
             memory: MemoryService::new(config.clone(), embedder, store),
@@ -50,7 +54,8 @@ where
             session: ChatSession::new(),
             prompt_builder: PromptBuilder::new(
                 config,
-                r#"
+                format!(
+                    r#"
                 Store ONLY:
                 - stable user facts
                 - preferences
@@ -61,7 +66,10 @@ where
                 - corrections
                 - meta discussion about memory
                 - system behavior
+
+                {user_prompt}
                 "#,
+                ),
             ),
             json_schema: JsonSchemaGenerator::new(tool_registry),
         }

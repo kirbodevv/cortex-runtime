@@ -4,6 +4,8 @@ pub struct CortexConfig {
     pub memory_threshold: f64,
     pub memory_importance_threshold: f32,
 
+    pub custom_system_prompt: Option<String>,
+
     pub openai_api_key: String,
 }
 
@@ -30,6 +32,8 @@ impl CortexConfig {
                 .unwrap_or("0.6".into())
                 .parse()
                 .unwrap(),
+
+            custom_system_prompt: dotenvy::var("CUSTOM_SYSTEM_PROMPT").ok(),
 
             openai_api_key: dotenvy::var("OPENAI_API_KEY").expect("OPENAI_API_KEY is required"),
         }
