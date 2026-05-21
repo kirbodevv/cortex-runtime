@@ -3,6 +3,8 @@ use crate::{
     domain::{MemoryItem, Message},
 };
 
+const RECENT_MESSAGE_COUNT: usize = 10;
+
 pub struct PromptBuilder {
     system: String,
 }
@@ -21,7 +23,7 @@ impl PromptBuilder {
             messages.push(Message::system(format!("Memory: {}", m.content())));
         }
 
-        messages.extend(session.messages().to_vec());
+        messages.extend(session.recent(RECENT_MESSAGE_COUNT).to_vec());
 
         messages
     }
