@@ -20,8 +20,15 @@ impl ChatSession {
         self.last_activity = Instant::now();
     }
 
+    #[allow(dead_code)]
     pub fn messages(&self) -> &[Message] {
         &self.messages
+    }
+
+    pub fn recent(&self, n: usize) -> &[Message] {
+        let len = self.messages.len();
+        let start = len.saturating_sub(n);
+        &self.messages[start..]
     }
 
     pub fn clear(&mut self) {
