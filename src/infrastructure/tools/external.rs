@@ -74,8 +74,6 @@ impl ToolProvider for ExternalToolProvider {
 
         let cfg_path = self.dir.join("tools.cfg");
 
-        println!("[LOAD] Loading tools from: {}", cfg_path.display());
-
         let content = match fs::read_to_string(cfg_path) {
             Ok(c) => c,
             Err(_) => return tools,
@@ -94,10 +92,7 @@ impl ToolProvider for ExternalToolProvider {
             }
 
             match ExternalTool::new(path).await {
-                Ok(tool) => {
-                    println!("[LOAD] Loaded tool: {}", tool.name());
-                    tools.push(Box::new(tool))
-                }
+                Ok(tool) => tools.push(Box::new(tool)),
                 Err(err) => {
                     eprintln!("Failed to load tool: {}", err);
                     continue;

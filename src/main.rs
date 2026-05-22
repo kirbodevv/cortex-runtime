@@ -46,7 +46,7 @@ async fn main() {
         match core.process(input.as_str()).await {
             Ok(res) => {
                 println!(
-                    "> {}\n\n Modules result: {}",
+                    "[AI]> {}\n\t[TOOL]>: {}",
                     res.response,
                     res.tool_call_result
                         .into_iter()

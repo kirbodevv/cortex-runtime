@@ -4,15 +4,14 @@ use crate::{
     app::{
         dto::{CoreResponse, ExecutorResponse, LLMResponse},
         executor::Executor,
-        json_schema::JsonSchemaGenerator,
+        llm::request_builder::LLMRequestBuilder,
         memory::memory::MemoryService,
         ports::{Embedder, LLMClient, MemoryStore},
-        prompt::PromptBuilder,
         session::ChatSession,
         tools::ToolRegistry,
     },
     config::core::CortexConfig,
-    domain::{LLMRequest, Message},
+    domain::Message,
     error::AppError,
 };
 
@@ -26,8 +25,7 @@ where
     memory: MemoryService<E, S>,
     executor: Executor,
     session: ChatSession,
-    prompt_builder: PromptBuilder,
-    json_schema: JsonSchemaGenerator,
+    llm_request_builder: LLMRequestBuilder,
 }
 
 impl<L, E, S> Core<L, E, S>
@@ -52,10 +50,13 @@ where
             memory: MemoryService::new(config.clone(), embedder, store),
             executor: Executor::new(tool_registry.clone()),
             session: ChatSession::new(),
-            prompt_builder: PromptBuilder::new(
-                config,
+            llm_request_builder: LLMRequestBuilder::new(
                 format!(
                     r#"
+                You MUST:
+                - always give a non-empty response
+                - if you call tools — always give an explanation
+
                 Store ONLY:
                 - stable user facts
                 - preferences
@@ -70,26 +71,20 @@ where
                 {user_prompt}
                 "#,
                 ),
+                tool_registry.clone(),
+                config.clone(),
             ),
-            json_schema: JsonSchemaGenerator::new(tool_registry),
         }
     }
 
     pub async fn process(&mut self, input: &str) -> Result<CoreResponse, AppError> {
-        let memories = self
-            .memory
-            .search(input)
-            .await?
-            .into_iter()
-            .map(|m| m.clone())
-            .collect::<Vec<_>>();
+        let memories = self.memory.search(input).await?;
 
         self.session.append(Message::user(input));
 
-        let messages = &self.prompt_builder.build(&self.session, &memories);
-        let json_schema = self.json_schema.generate(input);
-
-        let request = LLMRequest::new(messages, json_schema);
+        let request = self
+            .llm_request_builder
+            .build(&self.session, memories, input);
 
         let raw_response = self.llm.generate(request).await?;
         let llm_response = LLMResponse::try_from(raw_response)?;
@@ -122,7 +117,6 @@ where
     }
 
     pub async fn clear_session(&mut self) {
-        println!("[INFO] Clearing session");
         self.session.clear();
     }
 }

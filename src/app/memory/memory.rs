@@ -48,15 +48,6 @@ where
 
         let items = result.iter().map(|(item, _)| *item).collect::<Vec<_>>();
 
-        println!(
-            "[INFO MEM] added to context: {}",
-            items
-                .iter()
-                .map(|i| i.content())
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
-
         Ok(items)
     }
 
@@ -71,9 +62,8 @@ where
             .await
             .map_err(|e| AppError::Embedder(e))?;
 
-        if let Ok((mem, similarity)) = self.store.max_similarity(&embedding).await {
+        if let Ok((_, similarity)) = self.store.max_similarity(&embedding).await {
             if similarity > 0.9 {
-                println!("[INFO MEM] skipped similar memory: {}", mem.content());
                 return Ok(());
             }
         }
@@ -84,8 +74,6 @@ where
             .insert(StoredMemory { item, embedding })
             .await
             .map_err(|e| AppError::Memory(e))?;
-
-        println!("[INFO MEM] saved memory: {}", memory.summary);
 
         Ok(())
     }
